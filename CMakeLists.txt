@@ -9,4 +9,6 @@ set(CMAKE_C_STANDARD 99)
 add_executable(Code
         main.c
         svc.c
-        test1.c testcases.h)
+        test1.c
+        test2.c
+        testcases.h)

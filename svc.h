@@ -9,61 +9,83 @@ typedef struct resolution {
     char *resolved_file;
 } resolution;
 
-enum CHANGE_TYPE {  // change信息的类型 如果未指定 则为UNCHANGED
+typedef enum CHANGE_TYPE {  // change信息的类型 如果未指定 则为UNCHANGED
     UNCHANGED = 1, ADDITION, DELETION, MODIFICATION
-};
+} change_type;
 
 // 存储文件信息(链表存储)
 typedef struct file_struct {
     struct file_struct *next;
-    enum CHANGE_TYPE tpye;  //
-    char* file_name;        // 文件名
-    char* file_content;     // 文件内容
+    char *file_name;        // 文件名
+    char *file_content;     // 文件内容
     int file_hash;          // 文件hash
 } file_struct;
 
+// 引用file_struct的信息(链表存储)
+typedef struct file_list_struct {
+    struct file_list_struct *next;
+    struct file_struct *ptr;        // （指向）
+} file_list_struct;
+
 // 存储修改信息（从属于index_struct）
 typedef struct change_struct {
-    char* file_name;        // 文件名
+    char *file_name;        // 文件名
     enum CHANGE_TYPE change_type;
+    int file_hash;          // 文件hash
+    int file_hash_pre;      // 上一个commit中 该文件的hash
 } change_struct;
 
-// 保存与commit和checkout有关的文件信息
-typedef struct index_struct {
-    struct file_struct **file_struct;   // 指向文件信息
-    struct change_struct **file_message;  // （存储）change信息
-    int file_num;
-} index_struct;
+// 引用change_struct的信息(链表存储)
+typedef struct change_list_struct {
+    struct change_list_struct *next;
+    struct change_struct *ptr;          // （存储）
+} change_list_struct;
 
-// commit 只在init和svc_commit时作修改
-typedef struct commit {
-//    struct commit *parent;      // 父节点
-    struct commit **child_list; // （指向）可能有多个子节点
+// 保存与commit和checkout有关的文件信息
+typedef struct file_track_struct {
+    struct file_list_struct *file_list;   // 指向文件信息
+    struct change_list_struct *change_list;  // （存储）change信息 在commit时做处理
+    int file_num;
+} file_track_struct;
+
+// 引用file_struct的信息(链表存储)
+typedef struct commit_link_list {
+    struct commit_link_list *next;
+    struct commit_struct *ptr;
+} commit_link_list;
+
+// commit_struct 只在init和svc_commit时作修改
+typedef struct commit_struct {
+//    struct commit_struct *parent;      // 父节点
+    struct commit_link_list *parent_list; // （存储）可能有多个父节点
+    int parent_num;
+    struct commit_link_list *child_list; // （指向）可能有多个子节点
     int child_num;
     char *commit_id;
     char *message;
-    struct index_struct *index;  // （存储）commit的index
-} commit;
+    struct file_track_struct *file_track;  // （存储）commit的index
+    char *branch_name;
+} commit_struct;
 
 // 根据工作区变化进行实时修改
-typedef struct checkout {
-    struct checkout *next;        // 指向下一个checkout
+typedef struct checkout_struct {
+    struct checkout_struct *next;        // 指向下一个checkout
     char *branch_name;
-    struct commit *commit_ptr;
-    struct index_struct *index;  // （存储）工作区的index
-} checkout;
+    struct commit_struct *commit_pre;      // 当前checkout工作区的前一个commit
+    struct file_track_struct *file_track;  // （存储）工作区的index
+} checkout_struct;
 
 // 保存所有数据
 typedef struct helper_struct {
     // 指向工作区
-    struct checkout *head_checkout;
+    struct checkout_struct *head_checkout;
 
     // 指向第一个commit
-    struct commit *init_commit;
+    struct commit_struct *init_commit;
     int commit_num;
 
     // 指向第一个checkout 所有checkout为单链结构
-    struct checkout *init_checkout;
+    struct checkout_struct *init_checkout;
     int checkout_num;
 
     // 指向第一个file 所有file为单链结构
@@ -99,6 +121,91 @@ int svc_rm(void *helper, char *file_name);
 int svc_reset(void *helper, char *commit_id);
 
 char *svc_merge(void *helper, char *branch_name, resolution *resolutions, int n_resolutions);
+
+// DIY
+char *read_file(char *path);
+
+void print_file(void *helper);
+
+// 构造方法
+checkout_struct *construct_checkout(char *branch_name, commit_struct *commit_pre);
+
+change_list_struct *construct_change_list(change_struct *cg);
+
+change_struct *construct_change();
+
+file_list_struct *construct_file_list(file_struct *file);
+
+file_track_struct *construct_file_track();
+
+commit_link_list *construct_commit_link_list();
+
+commit_struct *construct_commit();
+
+helper_struct *construct_helper();
+
+file_struct *construct_file();
+
+file_struct *copy_construct_file(helper_struct **helper_output, file_struct *file);
+
+// 析构方法
+void free_checkout(checkout_struct *co);
+
+void free_change_list(change_list_struct *cl);
+
+void free_file_list(file_list_struct *fl);
+
+void free_file_list_single(file_list_struct *fl);
+
+void free_file_track(file_track_struct *ft);
+
+void free_commit_link_list(commit_link_list *ccl);
+
+void free_commit(commit_struct *c);
+
+void free_change(change_struct *cg);
+
+void free_file(file_struct *f);
+
+// 修改方法
+void commit_add_commit(commit_struct **c_parent_output, commit_struct *c_child);
+
+void commit_link_list_add_commit(commit_link_list **ccl_output, commit_struct *c);
+
+file_track_struct *deepcopy_file_track(file_track_struct *ft);
+
+void file_list_add_file(file_list_struct **fl_output, file_struct *file);
+
+//void change_list_add_file(change_list_struct *change_list_output, file_struct *file);
+void set_all_change(change_list_struct **change_list_output, change_type type);
+
+void copy_file_2_change(change_list_struct **change_list_output, file_list_struct *file_list);
+
+void helper_add_commit(helper_struct **helper_output, commit_struct *new_commit);
+
+void helper_add_file(helper_struct **helper_output, file_struct *new_file);
+
+void helper_add_checkout(helper_struct **helper_output, checkout_struct *new_checkout);
+
+void check_disk_file(file_track_struct **file_track_in_out, helper_struct *h);
+
+void get_new_change_list(change_list_struct **cl_output, file_list_struct *fl_old, file_list_struct *fl_new);
+
+void file_list_sort(file_list_struct **fl_output);
+
+void change_list_struct_add_change(change_list_struct **cl_output, change_struct *cg);
+
+void checkout_add_file(helper_struct **h_output, file_struct *file);
+
+commit_struct *helper_find_commit(helper_struct *helper, char *commit_id);
+
+char *int2hash(int id);
+
+int check_uncommit_change(helper_struct *helper);
+
+int diy_strcmp(char* str1, char* str2);
+
+void commit_write_all_file(commit_struct *commit);
 
 #endif
 
