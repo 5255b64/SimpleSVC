@@ -108,6 +108,7 @@ int test2() {
     fprintf(fp, "    return NULL;\n");
     fprintf(fp, "}\n");
     fclose(fp);
+//    printf("%d\n", check_not_commit_change((helper_struct*)helper));
 
     // 11）commit "Implemented svc_init"
     temp_char = svc_commit(helper, "Implemented svc_init");
@@ -116,11 +117,17 @@ int test2() {
     assert(strcmp(temp_char, "24829b") == 0);
 //    Return value: "24829b"
 
+//    printf("%d\n", check_not_commit_change((helper_struct*)helper));
+    // 11-2）print
+    print_commit(helper, "24829b");
+
 
     // 12）get_commit "24829b" "Implemented svc_init"(11)
     void *commit = get_commit(helper, "24829b");
     assert(strcmp(((commit_struct *) commit)->commit_id, "24829b") == 0);
 //    Return value: Pointer to area of memory containing the commit created above
+
+//    printf("%d\n", check_not_commit_change((helper_struct*)helper));
 
     // 13）get_prev_commits
     int n_prev;
@@ -130,10 +137,13 @@ int test2() {
 //    Return value: Pointer to an array of length one, containing "7b3e30"
 //    Afterwards, n_prev = 1
 
+//    printf("%d\n", check_not_commit_change((helper_struct*)helper));
+
     // 14）svc_checkout "master"
     temp_int = svc_checkout(helper, "master");
     assert(temp_int == 0);
 //    Return value: 0
+//    printf("%d\n", check_not_commit_change((helper_struct*)helper));
 
 //    The test framework creates a file resolutions/svc.c with the contents
 //      # include " svc . h " \ n
@@ -148,15 +158,17 @@ int test2() {
     fprintf(fp, "}\n");
     fclose(fp);
 
+//    printf("%d\n", check_not_commit_change((helper_struct*)helper));
 //        The following code is then executed to perform a merge:
 //    Resolution ( s ) are created by the test framework
     // 16）svc_merge
     resolution *resolutions = malloc(sizeof(resolution));
     resolutions[0].file_name = "COMP2017/svc.c";
-    resolutions[0].resolved_file = "resolutions/svc.c ";
+    resolutions[0].resolved_file = "resolutions/svc.c";
     // Call to merge function
     temp_char = svc_merge(helper, "random_branch", resolutions, 1);
     assert(temp_char!=NULL);
+    printf("%s\n", temp_char);
     assert(strcmp(temp_char, "48eac3") == 0);
     // The test framework will free the memory
     free(resolutions);

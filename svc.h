@@ -2,6 +2,10 @@
 #define svc_h
 
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <assert.h>
 
 typedef struct resolution {
     // NOTE: DO NOT MODIFY THIS STRUCT
@@ -43,8 +47,8 @@ typedef struct change_list_struct {
 
 // 保存与commit和checkout有关的文件信息
 typedef struct file_track_struct {
-    struct file_list_struct *file_list;   // 指向文件信息
-    struct change_list_struct *change_list;  // （存储）change信息 在commit时做处理
+    struct file_list_struct *file_list;     // （存储）工作区文件列表
+    struct change_list_struct *change_list;  // （存储）change列表信息 在commit时做处理
     int file_num;
 } file_track_struct;
 
@@ -122,10 +126,6 @@ int svc_reset(void *helper, char *commit_id);
 
 char *svc_merge(void *helper, char *branch_name, resolution *resolutions, int n_resolutions);
 
-// DIY
-char *read_file(char *path);
-
-void print_file(void *helper);
 
 // 构造方法
 checkout_struct *construct_checkout(char *branch_name, commit_struct *commit_pre);
@@ -140,13 +140,21 @@ file_track_struct *construct_file_track();
 
 commit_link_list *construct_commit_link_list();
 
-commit_struct *construct_commit(char* message);
+commit_struct *construct_commit(char *message);
 
 helper_struct *construct_helper();
 
 file_struct *construct_file();
 
-file_struct *copy_construct_file(file_struct *file);
+file_struct *deepcopy_file(file_struct *file);
+
+file_track_struct *deepcopy_file_track(file_track_struct *ft);
+
+file_list_struct *deepcopy_file_list(file_list_struct *old_fl);
+
+change_list_struct *deepcopy_change_list(change_list_struct *old_cl);
+
+change_struct *deepcopy_change(change_struct *old_cg);
 
 // 析构方法
 void free_checkout(checkout_struct *co);
@@ -160,6 +168,7 @@ void free_file_list_single(file_list_struct *fl);
 void free_file_track(file_track_struct *ft);
 
 void free_commit_link_child_list(commit_link_list *ccl);
+
 void free_commit_link_parent_list(commit_link_list *ccl);
 
 void free_commit(commit_struct *c);
@@ -168,16 +177,13 @@ void free_change(change_struct *cg);
 
 void free_file(file_struct *f);
 
-// 修改方法
+// 其它方法
 void commit_add_commit(commit_struct **c_parent_output, commit_struct *c_child);
 
 void commit_link_list_add_commit(commit_link_list **ccl_output, commit_struct *c);
 
-file_track_struct *deepcopy_file_track(file_track_struct *ft);
-
 void file_list_add_file(file_list_struct **fl_output, file_struct *file);
 
-//void change_list_add_file(change_list_struct *change_list_output, file_struct *file);
 void set_all_change(change_list_struct **change_list_output, change_type type);
 
 void copy_file_2_change(change_list_struct **change_list_output, file_list_struct *file_list);
@@ -190,7 +196,8 @@ void helper_add_checkout(helper_struct **helper_output, checkout_struct *new_che
 
 void check_disk_file(file_track_struct **file_track_in_out, helper_struct *h);
 
-void get_new_change_list(change_list_struct **cl_output, file_list_struct *fl_old, file_list_struct *fl_new);
+void new_change_list_from_file_list_compare(change_list_struct **cl_output, file_list_struct *fl_old,
+                                            file_list_struct *fl_new);
 
 void file_list_sort(file_list_struct **fl_output);
 
@@ -202,14 +209,21 @@ commit_struct *helper_find_commit(helper_struct *helper, char *commit_id);
 
 char *int2hash(int id);
 
-int check_uncommit_change(helper_struct *helper);
+int check_not_commit_change(helper_struct *helper);
 
-int diy_strcmp(char* str1, char* str2);
+int diy_strcmp(char *str1, char *str2);
 
 void commit_write_all_file(commit_struct *commit);
 
 commit_struct *get_commit_from_child(commit_link_list *child_list, char *commit_id);
 
 commit_struct *get_commit_recurisive(commit_struct *commit, char *commit_id);
+
+file_struct *find_file(helper_struct *helper, int file_hash);
+
+file_struct *disk_read_file(char *file_name);
+
+char *read_file(char *path);
+
 #endif
 
