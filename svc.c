@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <assert.h>
 
-#define IS_DEBUG 1
+#define IS_DEBUG 0
 
 void *svc_init(void) {
     helper_struct *helper = construct_helper();
@@ -72,10 +72,13 @@ char *svc_commit(void *helper, char *message) {
     }
     helper_struct *h = (helper_struct *) helper;
     // 生成新的commit
-    commit_struct *new_commit = construct_commit();
-    new_commit->message = message;
+    commit_struct *new_commit = construct_commit(message);
+//    new_commit->message = message;
     // 深拷贝 checkout_struct 的 file track
     new_commit->file_track = deepcopy_file_track(h->head_checkout->file_track);
+    // 释放change_list
+    free_change_list(new_commit->file_track->change_list);
+    new_commit->file_track->change_list=NULL;
     // 文件排序（根据file_name排序）
     file_list_sort(&(new_commit->file_track->file_list));
     // 将存储器中的文件与new_commit->file_track中的文件做对比
@@ -159,15 +162,52 @@ char *svc_commit(void *helper, char *message) {
     return result;
 }
 
-void *get_commit(void *helper, char *commit_id) {
-    helper_struct *h = (helper_struct *) helper;
-    commit_struct *c_ptr = h->init_commit;
-    while (c_ptr != NULL) {
-        if (strcmp(c_ptr->commit_id, commit_id) == 0) {
-            break;
+
+commit_struct *get_commit_from_child(commit_link_list *child_list, char *commit_id) {
+    if(child_list == NULL || commit_id == NULL){
+        return NULL;
+    }else{
+        // 递归搜索child_list
+        commit_link_list *cl_ptr = child_list;
+        while(cl_ptr!=NULL){
+            commit_struct *c = get_commit_recurisive(cl_ptr->ptr, commit_id);
+            if(c!=NULL){
+                return c;
+            }
+            cl_ptr=cl_ptr->next;
         }
+        return NULL;
     }
-    return c_ptr;
+}
+
+commit_struct *get_commit_recurisive(commit_struct *commit, char *commit_id) {
+    if (commit != NULL&&commit_id!=NULL) {
+        if (strcmp(commit->commit_id, commit_id) == 0) {
+            return commit;
+        }else{
+            return get_commit_from_child(commit->child_list,commit_id);
+        }
+    }else{
+        return NULL;
+    }
+}
+
+
+void *get_commit(void *helper, char *commit_id) {
+    if(helper==NULL||commit_id==NULL){
+        return NULL;
+    }
+    helper_struct *h = (helper_struct *) helper;
+    commit_struct *c = get_commit_recurisive(h->init_commit, commit_id);
+    return c;
+//    commit_struct *c_ptr = h->init_commit;
+//    while (c_ptr != NULL) {
+//        if (strcmp(c_ptr->commit_id, commit_id) == 0) {
+//            break;
+//        }
+//        c_ptr->child_list
+//    }
+//    return c_ptr;
 }
 
 char **get_prev_commits(void *helper, void *commit, int *n_prev) {
@@ -277,8 +317,8 @@ int svc_branch(void *helper, char *branch_name) {
         co_ptr = co_ptr->next;
     }
     // 检查是否有未commit的改动
-    int result = check_uncommit_change(h);
-    if (result != 1) {
+    int is_uncommit_exist = check_uncommit_change(h);
+    if (is_uncommit_exist != 1) {
         return -3;
     }
 
@@ -299,7 +339,8 @@ int check_uncommit_change(helper_struct *helper) {
     // 存在的文件 计算其哈希值 与file track中的哈希值做对比
     checkout_struct *co = helper->head_checkout;
     commit_struct *commit_pre = co->commit_pre;    // 当前checkout工作区的前一个commit
-    change_list_struct *new_change_list = ft_temp->change_list;
+//    change_list_struct *new_change_list = ft_temp->change_list;
+    change_list_struct *new_change_list=NULL;
     if (commit_pre == NULL) {
         // 当前工作区没有commit 所有文件均为ADDITION
         copy_file_2_change(&new_change_list, ft_temp->file_list);
@@ -344,8 +385,8 @@ int svc_checkout(void *helper, char *branch_name) {
 
     helper_struct *h = (helper_struct *) helper;
     // 检查是否有未commit的change
-    int result = check_uncommit_change(h);
-    if (result != 1) {
+    int is_uncommit_exist = check_uncommit_change(h);
+    if (is_uncommit_exist != 1) {
         // 存在未完成的commit
         return -2;
     }
@@ -389,7 +430,6 @@ char **list_branches(void *helper, int *n_branches) {
 }
 
 int svc_add(void *helper, char *file_name) {
-    // TODO 内存泄漏
     // 文件添加至helper_struct->init_file中
     // 并且链接到checkout
     FILE *fp = NULL;
@@ -513,13 +553,17 @@ int svc_reset(void *helper, char *commit_id) {
         return -2;
     }
 
-    // reset 忽略所有变更
-    // 将commit中的所有文件都输出到disk
+    // reset head
     h->head_checkout->commit_pre = c_ptr;
+    // 忽略所有变更 将commit中的所有文件都输出到disk
     commit_write_all_file(c_ptr);
 
+    // reset file_track
+    free_file_track(h->head_checkout->file_track);
+    h->head_checkout->file_track = deepcopy_file_track(h->head_checkout->commit_pre->file_track);
+
     // reset之后 部分commit需要被释放
-    free_commit_link_list(c_ptr->child_list);
+    free_commit_link_child_list(c_ptr->child_list);
     c_ptr->child_list = NULL;
 
     return 0;
@@ -527,19 +571,52 @@ int svc_reset(void *helper, char *commit_id) {
 
 char *svc_merge(void *helper, char *branch_name, struct resolution *resolutions, int n_resolutions) {
     // TODO: Implement
-
+    helper_struct *h=(helper_struct*)h;
     if (helper == NULL) {
-        return 0;
+        return NULL;
     }
     if (branch_name == NULL) {
-        return 0;
+        printf("Invalid branch name\n");
+        return NULL;
     }
-    if (resolutions == NULL) {
-        return 0;
+    // 检索branch_name 判断其是否存在
+    checkout_struct *co_ptr = h->init_checkout;
+    int is_branch_exist=-1;
+    while(co_ptr!=NULL){
+        if(strcmp(co_ptr->branch_name, branch_name)==0){
+            is_branch_exist=1;
+            break;
+        }
+        co_ptr=co_ptr->next;
     }
-    if (n_resolutions == -1) {
-        return 0;
+    if(is_branch_exist!=1){
+        // 不存在branch_name
+        printf("Branch not found\n");
+        return NULL;
     }
+    // 判断branch_name是否为当前checkout的branch_name
+    if(strcmp(h->head_checkout->branch_name,branch_name)==0){
+        printf("Cannot merge a branch with itself\n");
+        return NULL;
+    }
+    // 判断是否存在 uncommitted change
+    int is_uncommit_exist = check_uncommit_change(h);
+    if (is_uncommit_exist != 1) {
+        printf("Changes must be committed\n");
+        return NULL;
+    }
+    // merge过程
+    // 对比两个branch的file_track(生成change_list)
+    // 保留不含冲突的文件
+    // （冲突文件在change_list中的type为 MODIFICATION）
+    // （不冲突文件的type为 UNCHANGED ADDITION DELETION）
+
+
+
+
+
+    // TODO edit
+    printf("Merged branch [branch_name] replacing [branch_name]\n");
     return NULL;
 }
 
@@ -603,27 +680,33 @@ file_track_struct *deepcopy_file_track(file_track_struct *ft) {
     }
 
     // 深拷贝 change_list
-    if (ft->change_list != NULL) {
-        change_list_struct *new_ft_cl_head = construct_change_list(NULL);
-        change_list_struct *new_ft_cl_pre = new_ft_cl_head;
-        change_list_struct *new_ft_cl_next;
-        change_list_struct *ft_cl = ft->change_list;
+    if (ft->change_list == NULL) {
+        new_ft->change_list=NULL;
+    }else{
+        change_list_struct *new_cl_head = construct_change_list(NULL);
+        change_list_struct *new_cl_ptr = new_cl_head;
+        change_list_struct *old_cl = ft->change_list;
+        // 构建新的chage
         change_struct *new_change = construct_change();
-        new_change->change_type = ft_cl->ptr->change_type;
-        new_change->file_name = ft_cl->ptr->file_name;
-        new_change->file_hash = ft_cl->ptr->file_hash;
-        new_ft_cl_head->ptr = new_change;
-        ft_cl = ft_cl->next;
-        while (ft_cl != NULL) {
-            new_ft_cl_next = construct_change_list(new_change);
-            new_change = (change_struct *) malloc(sizeof(change_struct));
-            new_change->change_type = ft_cl->ptr->change_type;
-            new_change->file_name = ft_cl->ptr->file_name;
-            new_change->file_hash = ft_cl->ptr->file_hash;
-            new_ft_cl_pre->next = new_ft_cl_next;
-            new_ft_cl_pre = new_ft_cl_next;
-            ft_cl = ft_cl->next;
+        new_change->change_type = old_cl->ptr->change_type;
+        new_change->file_name = old_cl->ptr->file_name;
+        new_change->file_hash = old_cl->ptr->file_hash;
+        // 为link head 赋初始值
+        new_cl_head->ptr = new_change;
+
+        old_cl = old_cl->next;
+        while (old_cl != NULL) {
+            new_change = construct_change();
+            new_change->change_type = old_cl->ptr->change_type;
+            new_change->file_name = old_cl->ptr->file_name;
+            new_change->file_hash = old_cl->ptr->file_hash;
+            change_list_struct *new_cl= construct_change_list(new_change);
+            new_cl_ptr->next = new_cl;
+            new_cl_ptr = new_cl;
+            // 指向下一个
+            old_cl = old_cl->next;
         }
+        new_ft->change_list=new_cl_head;
     }
     return new_ft;
 }
@@ -769,9 +852,9 @@ file_track_struct *construct_file_track() {
     return ft;
 }
 
-commit_struct *construct_commit() {
+commit_struct *construct_commit(char *message) {
     commit_struct *c = (commit_struct *) malloc(sizeof(commit_struct));
-    c->message = NULL;
+    c->message = message;
     c->child_num = 0;
     c->parent_num = 0;
     c->child_list = NULL;
@@ -786,7 +869,7 @@ change_struct *construct_change() {
     change_struct *cg = (change_struct *) malloc(sizeof(change_struct));
     cg->file_name = NULL;
     cg->file_hash = -1;
-    cg->file_hash = -1;
+    cg->file_hash_pre = -1;
     cg->change_type = UNCHANGED;
     return cg;
 }
@@ -867,22 +950,34 @@ void free_change(change_struct *cg) {
 }
 
 // 释放commit_child_list中的所有comiit
-void free_commit_link_list(commit_link_list *ccl) {
+void free_commit_link_child_list(commit_link_list *ccl) {
     if (ccl != NULL) {
-        free_commit_link_list(ccl->next);
+        free_commit_link_child_list(ccl->next);
         free_commit(ccl->ptr);
         free(ccl);
     } else {
         if (IS_DEBUG == 1) {
-            fprintf(stderr, "ERROR free_commit_link_list(commit_link_list *ccl)==NULL\n");
+            fprintf(stderr, "ERROR free_commit_link_child_list(commit_link_list *ccl)==NULL\n");
+        }
+    }
+}
+// 释放commit_parent_list中的所有comiit
+void free_commit_link_parent_list(commit_link_list *ccl) {
+    if (ccl != NULL) {
+        free_commit_link_parent_list(ccl->next);
+//        free_commit(ccl->ptr);
+        free(ccl);
+    } else {
+        if (IS_DEBUG == 1) {
+            fprintf(stderr, "ERROR free_commit_link_child_list(commit_link_list *ccl)==NULL\n");
         }
     }
 }
 
 void free_commit(commit_struct *c) {
     if (c != NULL) {
-        free_commit_link_list(c->child_list);
-//        free_commit_link_list(c->parent_list);
+        free_commit_link_child_list(c->child_list);
+        free_commit_link_parent_list(c->parent_list);
         free_file_track(c->file_track);
 //        if(c->branch_name!=NULL){
 //            free(c->branch_name);
@@ -962,13 +1057,12 @@ file_struct *construct_file() {
 }
 
 // 拷贝构造函数
-file_struct *copy_construct_file(helper_struct **helper_output, file_struct *file) {
+file_struct *copy_construct_file(file_struct *file) {
     file_struct *new_file = (file_struct *) malloc(sizeof(file_struct));
     new_file->file_hash = file->file_hash;
     new_file->file_name = file->file_name;
     new_file->file_content = file->file_content;
     new_file->next = NULL;
-//    helper_add_file(helper_output, new_file);
     return new_file;
 }
 
@@ -1016,7 +1110,7 @@ void check_disk_file(file_track_struct **file_track_in_out, helper_struct *h) {
                     // 文件存在 比较hash值
                     if (hash != fl_mid->ptr->file_hash) {
                         // hash不相等 构建新对象
-                        file_struct *new_file = copy_construct_file(&h, fl_mid->ptr);
+                        file_struct *new_file = copy_construct_file(fl_mid->ptr);
                         new_file->file_content = read_file(fl_mid->ptr->file_name);
                         new_file->file_hash = hash;
                         // 使用新对象替代file track中的对象
@@ -1040,8 +1134,11 @@ void check_disk_file(file_track_struct **file_track_in_out, helper_struct *h) {
 void get_new_change_list(change_list_struct **cl_output, file_list_struct *fl_old, file_list_struct *fl_new) {
     change_list_struct *cl = *cl_output;
     if (cl != NULL) {
-        fprintf(stderr, "get_new_change_list(change_list_struct **cl_output == NULL\n");
+        if(IS_DEBUG) {
+            fprintf(stderr, "get_new_change_list(change_list_struct **cl_output == NULL\n");
+        }
         free_change_list(cl);
+        cl=NULL;
     }
     // 文件排序（根据file_name排序）
     file_list_sort(&fl_old);
@@ -1054,7 +1151,7 @@ void get_new_change_list(change_list_struct **cl_output, file_list_struct *fl_ol
         // 指针指向链表末尾 才结束循环
         int cmp_ressult;
         if (fl_old_ptr != NULL && fl_new_ptr != NULL) {
-            cmp_ressult = strcmp(
+            cmp_ressult = diy_strcmp(
                     fl_old_ptr->ptr->file_name,
                     fl_new_ptr->ptr->file_name
             );

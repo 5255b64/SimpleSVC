@@ -42,7 +42,7 @@ int main() {
 
 // 执行测试
     test1();
-//    test2();
+    test2();
 
     return 0;
 }

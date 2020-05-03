@@ -140,13 +140,13 @@ file_track_struct *construct_file_track();
 
 commit_link_list *construct_commit_link_list();
 
-commit_struct *construct_commit();
+commit_struct *construct_commit(char* message);
 
 helper_struct *construct_helper();
 
 file_struct *construct_file();
 
-file_struct *copy_construct_file(helper_struct **helper_output, file_struct *file);
+file_struct *copy_construct_file(file_struct *file);
 
 // 析构方法
 void free_checkout(checkout_struct *co);
@@ -159,7 +159,8 @@ void free_file_list_single(file_list_struct *fl);
 
 void free_file_track(file_track_struct *ft);
 
-void free_commit_link_list(commit_link_list *ccl);
+void free_commit_link_child_list(commit_link_list *ccl);
+void free_commit_link_parent_list(commit_link_list *ccl);
 
 void free_commit(commit_struct *c);
 
@@ -207,5 +208,8 @@ int diy_strcmp(char* str1, char* str2);
 
 void commit_write_all_file(commit_struct *commit);
 
+commit_struct *get_commit_from_child(commit_link_list *child_list, char *commit_id);
+
+commit_struct *get_commit_recurisive(commit_struct *commit, char *commit_id);
 #endif
 

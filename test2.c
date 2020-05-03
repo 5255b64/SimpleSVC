@@ -101,6 +101,13 @@ int test2() {
     assert(temp_int == 0);
 //    Return value: 0
 //    Then, the file COMP2017/svc.c is changed again to have the contents shown above.
+    // 10-2）修改文件"COMP2017/svc.c"
+    fp = fopen("COMP2017/svc.c", "w");
+    fprintf(fp, "#include \"svc.h\"\n");
+    fprintf(fp, "void *svc_init(void) {\n");
+    fprintf(fp, "    return NULL;\n");
+    fprintf(fp, "}\n");
+    fclose(fp);
 
     // 11）commit "Implemented svc_init"
     temp_char = svc_commit(helper, "Implemented svc_init");
@@ -149,6 +156,7 @@ int test2() {
     resolutions[0].resolved_file = "resolutions/svc.c ";
     // Call to merge function
     temp_char = svc_merge(helper, "random_branch", resolutions, 1);
+    assert(temp_char!=NULL);
     assert(strcmp(temp_char, "48eac3") == 0);
     // The test framework will free the memory
     free(resolutions);
