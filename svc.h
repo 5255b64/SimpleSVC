@@ -182,7 +182,7 @@ void commit_add_commit(commit_struct **c_parent_output, commit_struct *c_child);
 
 void commit_link_list_add_commit(commit_link_list **ccl_output, commit_struct *c);
 
-void file_list_add_file(file_list_struct **fl_output, file_struct *file);
+int file_list_add_file(file_list_struct **fl_output, file_struct *file);
 
 void set_all_change(change_list_struct **change_list_output, change_type type);
 
@@ -190,7 +190,7 @@ void copy_file_2_change(change_list_struct **change_list_output, file_list_struc
 
 void helper_add_commit(helper_struct **helper_output, commit_struct *new_commit);
 
-void helper_add_file(helper_struct **helper_output, file_struct *new_file);
+int helper_add_file(helper_struct **helper_output, file_struct *new_file);
 
 void helper_add_checkout(helper_struct **helper_output, checkout_struct *new_checkout);
 
@@ -203,7 +203,7 @@ void file_list_sort(file_list_struct **fl_output);
 
 void change_list_struct_add_change(change_list_struct **cl_output, change_struct *cg);
 
-void checkout_add_file(helper_struct **h_output, file_struct *file);
+int checkout_add_file(helper_struct **h_output, file_struct *file);
 
 commit_struct *helper_find_commit(helper_struct *helper, char *commit_id);
 
