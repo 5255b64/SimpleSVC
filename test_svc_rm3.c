@@ -4,7 +4,7 @@
 #include "svc.h"
 #include "testcases.h"
 
-int test_svc_rm1() {
+int test_svc_rm3() {
     void *helper = svc_init();
 
     int temp_int;

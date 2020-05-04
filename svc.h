@@ -132,19 +132,19 @@ checkout_struct *construct_checkout(char *branch_name, commit_struct *commit_pre
 
 change_list_struct *construct_change_list(change_struct *cg);
 
-change_struct *construct_change();
+change_struct *construct_change(char *file_name);
 
 file_list_struct *construct_file_list(file_struct *file);
 
 file_track_struct *construct_file_track();
 
-commit_link_list *construct_commit_link_list();
+commit_link_list *construct_commit_link_list(commit_struct *c);
 
 commit_struct *construct_commit(char *message);
 
 helper_struct *construct_helper();
 
-file_struct *construct_file();
+file_struct *construct_file(char *file_name);
 
 file_struct *deepcopy_file(file_struct *file);
 
@@ -178,7 +178,7 @@ void free_change(change_struct *cg);
 void free_file(file_struct *f);
 
 // 其它方法
-void commit_add_commit(commit_struct **c_parent_output, commit_struct *c_child);
+void commit_add_commit(commit_struct **c_parent_output, commit_struct **c_child_output);
 
 void commit_link_list_add_commit(commit_link_list **ccl_output, commit_struct *c);
 
@@ -225,5 +225,8 @@ file_struct *disk_read_file(char *file_name);
 
 char *read_file(char *path);
 
+char *deepcopy_str(char *c_input);
+
+int file_list_get_num(file_list_struct *fl);
 #endif
 

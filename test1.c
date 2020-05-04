@@ -34,36 +34,45 @@ int test1() {
     fprintf(fp, "5 3 2\n");
     fclose(fp);
 
-    char *tmp_char = NULL;
+//    char *tmp_char = NULL;
     assert(hash_file(helper, "hello.py")==2027);
 //    Return value: 2027 (from example above)
-    assert(hash_file(helper, "sample.txt")==1178);
-    assert(hash_file(helper, "Tests/diff.txt")==385);
-    assert(hash_file(helper, "Tests/test1.in")==564);
+//    assert(hash_file(helper, "sample.txt")==1178);
+//    assert(hash_file(helper, "Tests/diff.txt")==385);
+//    assert(hash_file(helper, "Tests/test1.in")==564);
 
-    assert(hash_file(helper, "fake.commit_pre")==-2);
+    assert(hash_file(helper, "fake.c")==-2);
 //    Return value: -2 (non-existent file_list)
 
     assert(svc_commit(helper, "No changes")==NULL);
 //    Return value: NULL
-
-    assert(svc_add(helper, "hello.py")==2027);
+    char *char_2_free;
+    char_2_free=deepcopy_str("hello.py");
+    assert(svc_add(helper, char_2_free)==2027);
+    free(char_2_free);
 //    Return value: 2027
 //    print_file(helper);
 
+    char_2_free=deepcopy_str("Tests/test1.in");
     assert(svc_add(helper, "Tests/test1.in")==564);
+    free(char_2_free);
 //    Return value: 564 (from example above)
 //    print_file(helper);
 
+    char_2_free=deepcopy_str("Tests/test1.in");
     assert(svc_add(helper, "Tests/test1.in")==-2);
+    free(char_2_free);
 //    Return value: -2
 //    print_file(helper);
-    tmp_char = svc_commit(helper, "Initial commit");
-    assert(tmp_char!=NULL);
-    assert(strcmp(tmp_char, "74cde7")==0);
+//    remove("hello.py");   // TODO delete
+    char_2_free=deepcopy_str("Initial commit");
+    char *commit_id = svc_commit(helper, char_2_free);
+    free(char_2_free);
+    assert(commit_id!=NULL);
+    assert(strcmp(commit_id, "74cde7")==0);
 //    Return value: "74cde7"
 
-    void *commit = get_commit(helper, "74cde7");
+    void *commit = get_commit(helper, commit_id);
     assert(strcmp(((commit_struct*)commit)->commit_id, "74cde7")==0);
 //    Return value: Pointer to area of memory containing the commit_struct created above
 
@@ -75,18 +84,39 @@ int test1() {
         printf("prev_commits[%d]=%s\n",i, prev_commits[i]);
         free(prev_commits[i]);
     }
+    free(prev_commits);
 
-    print_commit(helper, "74cde7");
+    char_2_free=deepcopy_str("74cde7");
+    print_commit(helper, char_2_free);
+    free(char_2_free);
+
+    // TODO delete
+//    int tmp_int = svc_branch(helper, "newBranch");
+//    printf("svc_branch=%d\n", tmp_int);
+//    svc_rm(helper, "hello.py");
+//    char *commit_id_1 = svc_commit(helper, "Test commit");
+//    printf("commit_id=%s\n", commit_id_1);
+//
+//    tmp_int = svc_checkout(helper, "newBranch");
+//    printf("svc_checkout=%d\n", tmp_int);
+//    svc_rm(helper, "Tests/test1.in");
+//    char *commit_id_2 = svc_commit(helper, "Test commit");
+//    printf("commit_id=%s\n", commit_id_2);
+//
+//    print_commit(helper, commit_id_2);
 
     int n;
     char **branches = list_branches(helper, &n);
     assert(branches!=NULL);
-    assert(strcmp(*branches, "master")==0);
-    assert(n==1);
-    for(int i=0;i<n;i++){
-        free(branches[i]);
+//    assert(strcmp((char*)branches, "master")==0);
+//    assert(n==1);
+    if(branches!=NULL) {
+        for (int i = 0; i < n; i++) {
+            printf("%s\n",branches[i]);
+//            free(branches[i]);
+        }
+        free(branches);
     }
-    free(branches);
 //    Output: master
 
     cleanup(helper);

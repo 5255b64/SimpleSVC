@@ -9,9 +9,12 @@ int main() {
     // DIY
 
 // 执行测试
-    test_svc_rm1();
+//    get_prev_commits3();
+//    test_svc_checkout1();
+    test_print_commit_3();
+//    test_svc_rm1();
     test1();
-    test2();
+//    test2();
 
     return 0;
 }
